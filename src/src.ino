@@ -202,11 +202,8 @@ boolean blueToothTimedOut() {
   digitalWrite(RED_LED_GPIO_NUM, LOW);
   delay(1000);
   unsigned long currentTime = millis();
-  Serial.println(currentTime / 1000);
   if (currentTime - previousTime >= interval) {
     previousTime = currentTime;
-    Serial.println("30 Seconds Over");
-    digitalWrite(RED_LED_GPIO_NUM, LOW);
     return true;
   }
   return false;
