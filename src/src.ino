@@ -11,7 +11,7 @@
 #define EEPROM_SIZE 512          //Size used from the EEPROM to store ssid and password (max = 512bytes)
 BluetoothSerial SerialBT;        //Object for Bluetooth
 unsigned long previousTime = 0;  //Used to track elapsed time
-unsigned int interval = 30000;   //Time to wait for a bluetooth connection ms (30s)
+unsigned int interval = 1000;    //Time to wait for a bluetooth connection ms (30s)
 
 String FIREBASE_HOST = "https://bambino-4aba4-default-rtdb.firebaseio.com/";
 String FIREBASE_AUTH = "AIzaSyDbKf1iJz7E5Yibr_W0UYcg_73NmbxWu-g";
@@ -68,7 +68,7 @@ void setupCamera() {
   // init with high specs to pre-allocate larger buffers
   if (psramFound()) {
 
-    config.frame_size = FRAMESIZE_XGA;
+    config.frame_size = FRAMESIZE_VGA;
 
     config.jpeg_quality = 10;  // 0-63 lower number means higher quality
 
@@ -89,7 +89,7 @@ void setupCamera() {
     ESP.restart();
   }
   sensor_t *s = esp_camera_sensor_get();
-  s->set_framesize(s, FRAMESIZE_XGA);       // VGA|CIF|QVGA|HQVGA|QQVGA   ( UXGA? SXGA? XGA? SVGA? )
+  s->set_framesize(s, FRAMESIZE_VGA);       // VGA|CIF|QVGA|HQVGA|QQVGA   ( UXGA? SXGA? XGA? SVGA? )
   s->set_brightness(s, 0);                  // -2 to 2
   s->set_contrast(s, 0);                    // -2 to 2
   s->set_saturation(s, 0);                  // -2 to 2
@@ -129,6 +129,19 @@ String getPhotoBase64() {
 
   esp_camera_fb_return(fb);
   return encrypt;
+}
+
+boolean blueToothTimedOut() {
+  digitalWrite(RED_LED_GPIO_NUM, HIGH);
+  delay(1000);
+  digitalWrite(RED_LED_GPIO_NUM, LOW);
+  delay(1000);
+  unsigned long currentTime = millis();
+  if (currentTime - previousTime >= interval) {
+    previousTime = currentTime;
+    return true;
+  }
+  return false;
 }
 
 void setup() {
@@ -196,23 +209,57 @@ void setup() {
   setupCamera();
 }
 
-boolean blueToothTimedOut() {
-  digitalWrite(RED_LED_GPIO_NUM, HIGH);
-  delay(1000);
-  digitalWrite(RED_LED_GPIO_NUM, LOW);
-  delay(1000);
-  unsigned long currentTime = millis();
-  if (currentTime - previousTime >= interval) {
-    previousTime = currentTime;
-    return true;
+void capturePhotoUploadToFirebase() {
+
+  Firebase.begin(FIREBASE_HOST, FIREBASE_AUTH);
+  Firebase.reconnectWiFi(true);
+  Firebase.setMaxRetry(firebaseData, 3);
+  Firebase.setMaxErrorQueue(firebaseData, 30);
+  Firebase.enableClassicRequest(firebaseData, true);
+  String photoBase64 = getPhotoBase64();
+  Serial.println(photoBase64);
+  int nbSubStrings = photoBase64.length() / 10000;  //The number of 10k substrings
+
+  String photoPath = "/esp32-cam";
+
+  for (int i = 0; i < nbSubStrings; i++) {
+    FirebaseJson json;
+    json.set("photo", photoBase64.substring(i * 10000, (i + 1) * 10000));
+    if (Firebase.setJSON(firebaseData, photoPath + i, json)) {
+      // Serial.println(firebaseData.dataPath());
+      // Serial.println(firebaseData.pushName());
+      // Serial.println(firebaseData.dataPath() + "/" + firebaseData.pushName());
+      Serial.println("Image Uploaded" + i);
+    } else {
+      Serial.println(firebaseData.errorReason());
+    }
   }
-  return false;
+
+  FirebaseJson json2;
+  json2.set("photoL", photoBase64.substring(nbSubStrings * 10000, photoBase64.length()));
+  if (Firebase.setJSON(firebaseData, photoPath + "L", json2)) {
+    // Serial.println(firebaseData.dataPath());
+    // Serial.println(firebaseData.pushName());
+    // Serial.println(firebaseData.dataPath() + "/" + firebaseData.pushName());
+    Serial.println("Image Uploaded L");
+  } else {
+    Serial.println(firebaseData.errorReason());
+  }
+}
+
+void updateStateFromFirebase() {
+  if (Firebase.RTDB.getBool(&firebaseData, "/FlashLED")) {
+    if (firebaseData.dataType() == "boolean") {
+      bool boolValue = firebaseData.boolData();
+      digitalWrite(FLASH_LED_GPIO_NUM, boolValue);
+      Serial.println(boolValue);
+    }
+  } else {
+    Serial.println(firebaseData.errorReason());
+  }
 }
 
 void loop() {
   // put your main code here, to run repeatedly:
-  // digitalWrite(RED_LED_GPIO_NUM, HIGH);  //Red LED On means connected
-  // delay(1000);
-  // digitalWrite(RED_LED_GPIO_NUM, LOW);
-  // delay(1000);
+  capturePhotoUploadToFirebase();
 }
