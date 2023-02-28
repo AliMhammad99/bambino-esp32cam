@@ -137,7 +137,7 @@ void setup() {
   Serial.begin(115200);
   SerialBT.begin("Bambino");
   setupLEDs();
-  
+
   //After power up or reset Bluetooth will start for 30s
   while (!blueToothTimedOut()) {
     //Check if any data is recieved
@@ -206,7 +206,7 @@ boolean blueToothTimedOut() {
   if (currentTime - previousTime >= interval) {
     previousTime = currentTime;
     Serial.println("30 Seconds Over");
-    // digitalWrite(RED_LED_GPIO_NUM, LOW);
+    digitalWrite(RED_LED_GPIO_NUM, LOW);
     return true;
   }
   return false;
