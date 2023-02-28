@@ -7,11 +7,12 @@
 #include "soc/soc.h"
 #include "soc/rtc_cntl_reg.h"
 #include "esp_camera.h"
+#include "esp_bt.h"
 
 #define EEPROM_SIZE 512          //Size used from the EEPROM to store ssid and password (max = 512bytes)
 BluetoothSerial SerialBT;        //Object for Bluetooth
 unsigned long previousTime = 0;  //Used to track elapsed time
-unsigned int interval = 1000;    //Time to wait for a bluetooth connection ms (30s)
+unsigned int interval = 5000;    //Time to wait for a bluetooth connection ms (30s)
 
 String FIREBASE_HOST = "https://bambino-4aba4-default-rtdb.firebaseio.com/";
 String FIREBASE_AUTH = "AIzaSyDbKf1iJz7E5Yibr_W0UYcg_73NmbxWu-g";
@@ -63,19 +64,19 @@ void setupCamera() {
   config.pin_sscb_scl = SIOC_GPIO_NUM;
   config.pin_pwdn = PWDN_GPIO_NUM;
   config.pin_reset = RESET_GPIO_NUM;
-  config.xclk_freq_hz = 5000000;
+  config.xclk_freq_hz = 20000000;
   config.pixel_format = PIXFORMAT_JPEG;
   // init with high specs to pre-allocate larger buffers
   if (psramFound()) {
 
-    config.frame_size = FRAMESIZE_VGA;
+    config.frame_size = FRAMESIZE_XGA;
 
-    config.jpeg_quality = 10;  // 0-63 lower number means higher quality
+    config.jpeg_quality = 12;  // 0-63 lower number means higher quality
 
     config.fb_count = 1;
   } else {
 
-    config.frame_size = FRAMESIZE_VGA;
+    config.frame_size = FRAMESIZE_XGA;
 
     config.jpeg_quality = 12;  // 0-63 lower number means higher quality
 
@@ -89,7 +90,7 @@ void setupCamera() {
     ESP.restart();
   }
   sensor_t *s = esp_camera_sensor_get();
-  s->set_framesize(s, FRAMESIZE_VGA);       // VGA|CIF|QVGA|HQVGA|QQVGA   ( UXGA? SXGA? XGA? SVGA? )
+  s->set_framesize(s, FRAMESIZE_XGA);       // VGA|CIF|QVGA|HQVGA|QQVGA   ( UXGA? SXGA? XGA? SVGA? )
   s->set_brightness(s, 0);                  // -2 to 2
   s->set_contrast(s, 0);                    // -2 to 2
   s->set_saturation(s, 0);                  // -2 to 2
@@ -185,14 +186,22 @@ void setup() {
     //Break the bluetooth loop
     break;
   }
+
+  //Turn off bluetooth
+  btStop();
+  SerialBT.end();
+  // esp_bt_mem_release();
+  esp_bt_controller_mem_release(ESP_BT_MODE_BTDM);
+  esp_bt_controller_mem_release(ESP_BT_MODE_IDLE);
+  esp_bt_controller_mem_release(ESP_BT_MODE_BLE);
+  esp_bt_controller_mem_release(ESP_BT_MODE_CLASSIC_BT);
+  // free();
+  delay(2000);
+
   //Read WiFi Credentials from EEPROM
   String ssid = EEPROM.readString(0);
   String password = EEPROM.readString(256);
   Serial.println(ssid + " " + password);
-
-  //Turn off bluetooth
-  btStop();
-  delay(2000);
 
   //Try to connect to Wifi using ssid and password
   WiFi.mode(WIFI_STA);
@@ -233,6 +242,7 @@ void capturePhotoUploadToFirebase() {
     } else {
       Serial.println(firebaseData.errorReason());
     }
+    // free();    
   }
 
   FirebaseJson json2;
@@ -245,6 +255,7 @@ void capturePhotoUploadToFirebase() {
   } else {
     Serial.println(firebaseData.errorReason());
   }
+  // free();
 }
 
 void updateStateFromFirebase() {
@@ -252,7 +263,7 @@ void updateStateFromFirebase() {
     if (firebaseData.dataType() == "boolean") {
       bool boolValue = firebaseData.boolData();
       digitalWrite(FLASH_LED_GPIO_NUM, boolValue);
-      Serial.println(boolValue);
+      // Serial.println(boolValue);
     }
   } else {
     Serial.println(firebaseData.errorReason());
@@ -261,5 +272,6 @@ void updateStateFromFirebase() {
 
 void loop() {
   // put your main code here, to run repeatedly:
+  updateStateFromFirebase();
   capturePhotoUploadToFirebase();
 }
