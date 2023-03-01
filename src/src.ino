@@ -12,7 +12,7 @@
 #define EEPROM_SIZE 512          //Size used from the EEPROM to store ssid and password (max = 512bytes)
 BluetoothSerial SerialBT;        //Object for Bluetooth
 unsigned long previousTime = 0;  //Used to track elapsed time
-unsigned int interval = 5000;    //Time to wait for a bluetooth connection ms (30s)
+unsigned int interval = 1000;    //Time to wait for a bluetooth connection ms (30s)
 
 String FIREBASE_HOST = "https://bambino-4aba4-default-rtdb.firebaseio.com/";
 String FIREBASE_AUTH = "AIzaSyDbKf1iJz7E5Yibr_W0UYcg_73NmbxWu-g";
@@ -64,7 +64,7 @@ void setupCamera() {
   config.pin_sscb_scl = SIOC_GPIO_NUM;
   config.pin_pwdn = PWDN_GPIO_NUM;
   config.pin_reset = RESET_GPIO_NUM;
-  config.xclk_freq_hz = 20000000;
+  config.xclk_freq_hz = 5000000;
   config.pixel_format = PIXFORMAT_JPEG;
   // init with high specs to pre-allocate larger buffers
   if (psramFound()) {
@@ -76,6 +76,7 @@ void setupCamera() {
     config.fb_count = 1;
   } else {
 
+    Serial.println("NO PSRAM ----");    
     config.frame_size = FRAMESIZE_XGA;
 
     config.jpeg_quality = 12;  // 0-63 lower number means higher quality
@@ -90,7 +91,7 @@ void setupCamera() {
     ESP.restart();
   }
   sensor_t *s = esp_camera_sensor_get();
-  s->set_framesize(s, FRAMESIZE_XGA);       // VGA|CIF|QVGA|HQVGA|QQVGA   ( UXGA? SXGA? XGA? SVGA? )
+  s->set_framesize(s, FRAMESIZE_XGA);     // VGA|CIF|QVGA|HQVGA|QQVGA   ( UXGA? SXGA? XGA? SVGA? )
   s->set_brightness(s, 0);                  // -2 to 2
   s->set_contrast(s, 0);                    // -2 to 2
   s->set_saturation(s, 0);                  // -2 to 2
@@ -190,7 +191,6 @@ void setup() {
   //Turn off bluetooth
   btStop();
   SerialBT.end();
-  // esp_bt_mem_release();
   esp_bt_controller_mem_release(ESP_BT_MODE_BTDM);
   esp_bt_controller_mem_release(ESP_BT_MODE_IDLE);
   esp_bt_controller_mem_release(ESP_BT_MODE_BLE);
@@ -229,29 +229,31 @@ void capturePhotoUploadToFirebase() {
   Serial.println(photoBase64);
   int nbSubStrings = photoBase64.length() / 10000;  //The number of 10k substrings
 
-  String photoPath = "/esp32-cam";
+  String photoPath = "/c";
 
   for (int i = 0; i < nbSubStrings; i++) {
     FirebaseJson json;
-    json.set("photo", photoBase64.substring(i * 10000, (i + 1) * 10000));
-    if (Firebase.setJSON(firebaseData, photoPath + i, json)) {
+    json.set("p"+i, photoBase64.substring(0, 10000));
+    
+    if (Firebase.setJSON(firebaseData, photoPath, json)) {
       // Serial.println(firebaseData.dataPath());
       // Serial.println(firebaseData.pushName());
       // Serial.println(firebaseData.dataPath() + "/" + firebaseData.pushName());
-      Serial.println("Image Uploaded" + i);
+      Serial.println("Uploaded");
     } else {
       Serial.println(firebaseData.errorReason());
     }
-    // free();    
+    // free();
+    photoBase64 = photoBase64.substring(10000, photoBase64.length());
   }
 
   FirebaseJson json2;
-  json2.set("photoL", photoBase64.substring(nbSubStrings * 10000, photoBase64.length()));
+  json2.set("l", photoBase64);
   if (Firebase.setJSON(firebaseData, photoPath + "L", json2)) {
     // Serial.println(firebaseData.dataPath());
     // Serial.println(firebaseData.pushName());
     // Serial.println(firebaseData.dataPath() + "/" + firebaseData.pushName());
-    Serial.println("Image Uploaded L");
+    Serial.println("Uploaded L");
   } else {
     Serial.println(firebaseData.errorReason());
   }
@@ -270,8 +272,13 @@ void updateStateFromFirebase() {
   }
 }
 
+void deletePreviousFrameFromFirebase(){
+  Firebase.remove(firebaseData, "/c");
+}
+
 void loop() {
   // put your main code here, to run repeatedly:
-  updateStateFromFirebase();
   capturePhotoUploadToFirebase();
+  // updateStateFromFirebase();
+  deletePreviousFrameFromFirebase();
 }
