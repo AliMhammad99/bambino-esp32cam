@@ -229,13 +229,13 @@ void capturePhotoUploadToFirebase() {
   Serial.println(photoBase64);
   int nbSubStrings = photoBase64.length() / 10000;  //The number of 10k substrings
 
-  String photoPath = "/c";
+  String photoPath = "/c/p";
 
   for (int i = 0; i < nbSubStrings; i++) {
     FirebaseJson json;
-    json.set("p"+i, photoBase64.substring(0, 10000));
+    json.set("p", photoBase64.substring(0, 10000));
     
-    if (Firebase.setJSON(firebaseData, photoPath, json)) {
+    if (Firebase.setJSON(firebaseData, photoPath+i, json)) {
       // Serial.println(firebaseData.dataPath());
       // Serial.println(firebaseData.pushName());
       // Serial.println(firebaseData.dataPath() + "/" + firebaseData.pushName());
@@ -248,8 +248,8 @@ void capturePhotoUploadToFirebase() {
   }
 
   FirebaseJson json2;
-  json2.set("l", photoBase64);
-  if (Firebase.setJSON(firebaseData, photoPath + "L", json2)) {
+  json2.set("p", photoBase64);
+  if (Firebase.setJSON(firebaseData, photoPath+"L", json2)) {
     // Serial.println(firebaseData.dataPath());
     // Serial.println(firebaseData.pushName());
     // Serial.println(firebaseData.dataPath() + "/" + firebaseData.pushName());
@@ -273,12 +273,19 @@ void updateStateFromFirebase() {
 }
 
 void deletePreviousFrameFromFirebase(){
-  Firebase.remove(firebaseData, "/c");
+  Firebase.deleteNode(firebaseData, "/c");
+
+  // if (firebaseData.success()) {
+  //   Serial.println("Data deleted successfully!");
+  // } else {
+  //   Serial.println("Data deletion failed!");
+  //   Serial.println(firebaseData.errorReason());
+  // }
 }
 
 void loop() {
   // put your main code here, to run repeatedly:
   capturePhotoUploadToFirebase();
-  // updateStateFromFirebase();
-  deletePreviousFrameFromFirebase();
+  updateStateFromFirebase();
+  // deletePreviousFrameFromFirebase();
 }
