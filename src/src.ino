@@ -146,6 +146,14 @@ boolean blueToothTimedOut() {
   return false;
 }
 
+void setupFirebase(){
+  Firebase.begin(FIREBASE_HOST, FIREBASE_AUTH);
+  Firebase.reconnectWiFi(true);
+  Firebase.setMaxRetry(firebaseData, 3);
+  Firebase.setMaxErrorQueue(firebaseData, 30);
+  Firebase.enableClassicRequest(firebaseData, true);
+}
+
 void setup() {
   // put your setup code here, to run once:
   EEPROM.begin(EEPROM_SIZE);
@@ -216,26 +224,22 @@ void setup() {
   }
 
   setupCamera();
+  setupFirebase();
 }
 
 void capturePhotoUploadToFirebase() {
-
-  Firebase.begin(FIREBASE_HOST, FIREBASE_AUTH);
-  Firebase.reconnectWiFi(true);
-  Firebase.setMaxRetry(firebaseData, 3);
-  Firebase.setMaxErrorQueue(firebaseData, 30);
-  Firebase.enableClassicRequest(firebaseData, true);
   String photoBase64 = getPhotoBase64();
   Serial.println(photoBase64);
   int nbSubStrings = photoBase64.length() / 10000;  //The number of 10k substrings
+  while(!Firebase.RTDB.setInt(&firebaseData, "/nbSubStrings", nbSubStrings));
 
-  String photoPath = "/c/p";
+  String photoPath = "/c";
 
   for (int i = 0; i < nbSubStrings; i++) {
     FirebaseJson json;
-    json.set("p", photoBase64.substring(0, 10000));
+    json.set("p"+String(i), photoBase64.substring(0, 10000));
     
-    if (Firebase.setJSON(firebaseData, photoPath+i, json)) {
+    if (Firebase.updateNode(firebaseData, photoPath, json)) {
       // Serial.println(firebaseData.dataPath());
       // Serial.println(firebaseData.pushName());
       // Serial.println(firebaseData.dataPath() + "/" + firebaseData.pushName());
@@ -248,8 +252,8 @@ void capturePhotoUploadToFirebase() {
   }
 
   FirebaseJson json2;
-  json2.set("p", photoBase64);
-  if (Firebase.setJSON(firebaseData, photoPath+"L", json2)) {
+  json2.set("pL", photoBase64);
+  if (Firebase.updateNode(firebaseData, photoPath, json2)) {
     // Serial.println(firebaseData.dataPath());
     // Serial.println(firebaseData.pushName());
     // Serial.println(firebaseData.dataPath() + "/" + firebaseData.pushName());
@@ -257,7 +261,6 @@ void capturePhotoUploadToFirebase() {
   } else {
     Serial.println(firebaseData.errorReason());
   }
-  // free();
 }
 
 void updateStateFromFirebase() {
