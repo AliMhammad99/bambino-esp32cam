@@ -76,7 +76,7 @@ void setupCamera() {
     config.fb_count = 1;
   } else {
 
-    Serial.println("NO PSRAM ----");    
+    // Serial.println("NO PSRAM ----");    
     config.frame_size = FRAMESIZE_XGA;
 
     config.jpeg_quality = 12;  // 0-63 lower number means higher quality
@@ -86,7 +86,7 @@ void setupCamera() {
   // camera init
   esp_err_t err = esp_camera_init(&config);
   if (err != ESP_OK) {
-    Serial.printf("Camera init failed with error 0x%x", err);
+    // Serial.printf("Camera init failed with error 0x%x", err);
     delay(1000);
     ESP.restart();
   }
@@ -122,7 +122,7 @@ String getPhotoBase64() {
   fb = esp_camera_fb_get();
 
   if (!fb) {
-    Serial.println("Camera capture failed");
+    // Serial.println("Camera capture failed");
     return "";
   }
 
@@ -157,7 +157,7 @@ void setupFirebase(){
 void setup() {
   // put your setup code here, to run once:
   EEPROM.begin(EEPROM_SIZE);
-  Serial.begin(115200);
+  // Serial.begin(115200);
   SerialBT.begin("Bambino");
   setupLEDs();
 
@@ -169,7 +169,7 @@ void setup() {
       continue;
     }
     //Data recieved on Bluetooth (send any data to signify connection)
-    Serial.println(SerialBT.readStringUntil('\n'));
+    // Serial.println(SerialBT.readStringUntil('\n'));
 
     //Wait until recieving ssid
     while (!SerialBT.available())
@@ -209,18 +209,18 @@ void setup() {
   //Read WiFi Credentials from EEPROM
   String ssid = EEPROM.readString(0);
   String password = EEPROM.readString(256);
-  Serial.println(ssid + " " + password);
+  // Serial.println(ssid + " " + password);
 
   //Try to connect to Wifi using ssid and password
   WiFi.mode(WIFI_STA);
   WiFi.begin((const char *)ssid.c_str(), (const char *)password.c_str());
 
   if (WiFi.waitForConnectResult() != WL_CONNECTED) {
-    Serial.println("WiFi Failed, Restarting...");
+    // Serial.println("WiFi Failed, Restarting...");
     ESP.restart();  // to restart ESP32
   } else {
-    Serial.print("Wifi Connected to ");
-    Serial.println(ssid);
+    // Serial.print("Wifi Connected to ");
+    // Serial.println(ssid);
   }
 
   setupCamera();
@@ -229,7 +229,7 @@ void setup() {
 
 void capturePhotoUploadToFirebase() {
   String photoBase64 = getPhotoBase64();
-  Serial.println(photoBase64);
+  // Serial.println(photoBase64);
   int nbSubStrings = photoBase64.length() / 10000;  //The number of 10k substrings
   while(!Firebase.RTDB.setInt(&firebaseData, "/nbSubStrings", nbSubStrings));
 
@@ -238,29 +238,30 @@ void capturePhotoUploadToFirebase() {
   for (int i = 0; i < nbSubStrings; i++) {
     FirebaseJson json;
     json.set("p"+String(i), photoBase64.substring(0, 10000));
-    
-    if (Firebase.updateNode(firebaseData, photoPath, json)) {
-      // Serial.println(firebaseData.dataPath());
-      // Serial.println(firebaseData.pushName());
-      // Serial.println(firebaseData.dataPath() + "/" + firebaseData.pushName());
-      Serial.println("Uploaded");
-    } else {
-      Serial.println(firebaseData.errorReason());
-    }
+    Firebase.updateNode(firebaseData, photoPath, json);
+    // if (Firebase.updateNode(firebaseData, photoPath, json)) {
+    //   // Serial.println(firebaseData.dataPath());
+    //   // Serial.println(firebaseData.pushName());
+    //   // Serial.println(firebaseData.dataPath() + "/" + firebaseData.pushName());
+    //   // Serial.println("Uploaded");
+    // } else {
+    //   // Serial.println(firebaseData.errorReason());
+    // }
     // free();
     photoBase64 = photoBase64.substring(10000, photoBase64.length());
   }
 
   FirebaseJson json2;
   json2.set("pL", photoBase64);
-  if (Firebase.updateNode(firebaseData, photoPath, json2)) {
-    // Serial.println(firebaseData.dataPath());
-    // Serial.println(firebaseData.pushName());
-    // Serial.println(firebaseData.dataPath() + "/" + firebaseData.pushName());
-    Serial.println("Uploaded L");
-  } else {
-    Serial.println(firebaseData.errorReason());
-  }
+  Firebase.updateNode(firebaseData, photoPath, json2);
+  // if (Firebase.updateNode(firebaseData, photoPath, json2)) {
+  //   // Serial.println(firebaseData.dataPath());
+  //   // Serial.println(firebaseData.pushName());
+  //   // Serial.println(firebaseData.dataPath() + "/" + firebaseData.pushName());
+  //   // Serial.println("Uploaded L");
+  // } else {
+  //   // Serial.println(firebaseData.errorReason());
+  // }
 }
 
 void updateStateFromFirebase() {
@@ -271,7 +272,7 @@ void updateStateFromFirebase() {
       // Serial.println(boolValue);
     }
   } else {
-    Serial.println(firebaseData.errorReason());
+    // Serial.println(firebaseData.errorReason());
   }
 }
 
