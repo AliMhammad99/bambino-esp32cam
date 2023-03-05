@@ -232,7 +232,9 @@ void capturePhotoUploadToFirebase() {
   // Serial.println(photoBase64);
   int nbSubStrings = photoBase64.length() / 10000;  //The number of 10k substrings
   while(!Firebase.RTDB.setInt(&firebaseData, "/nbSubStrings", nbSubStrings));
-
+ 
+  Firebase.RTDB.setBool(&firebaseData, "/uploading", true);
+  
   String photoPath = "/c";
 
   for (int i = 0; i < nbSubStrings; i++) {
@@ -262,6 +264,8 @@ void capturePhotoUploadToFirebase() {
   // } else {
   //   // Serial.println(firebaseData.errorReason());
   // }
+
+  Firebase.RTDB.setBool(&firebaseData, "/uploading", false);
 }
 
 void updateStateFromFirebase() {
