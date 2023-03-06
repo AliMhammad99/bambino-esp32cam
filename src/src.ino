@@ -69,7 +69,7 @@ void setupCamera() {
   // init with high specs to pre-allocate larger buffers
   if (psramFound()) {
 
-    config.frame_size = FRAMESIZE_XGA;
+    config.frame_size = FRAMESIZE_SVGA;
 
     config.jpeg_quality = 12;  // 0-63 lower number means higher quality
 
@@ -77,7 +77,7 @@ void setupCamera() {
   } else {
 
     // Serial.println("NO PSRAM ----");    
-    config.frame_size = FRAMESIZE_XGA;
+    config.frame_size = FRAMESIZE_SVGA;
 
     config.jpeg_quality = 12;  // 0-63 lower number means higher quality
 
@@ -91,7 +91,7 @@ void setupCamera() {
     ESP.restart();
   }
   sensor_t *s = esp_camera_sensor_get();
-  s->set_framesize(s, FRAMESIZE_XGA);     // VGA|CIF|QVGA|HQVGA|QQVGA   ( UXGA? SXGA? XGA? SVGA? )
+  s->set_framesize(s, FRAMESIZE_SVGA);     // VGA|CIF|QVGA|HQVGA|QQVGA   ( UXGA? SXGA? XGA? SVGA? )
   s->set_brightness(s, 0);                  // -2 to 2
   s->set_contrast(s, 0);                    // -2 to 2
   s->set_saturation(s, 0);                  // -2 to 2
