@@ -230,7 +230,7 @@ void setup() {
 void capturePhotoUploadToFirebase() {
   String photoBase64 = getPhotoBase64();
   // Serial.println(photoBase64);
-  int nbSubStrings = photoBase64.length() / 10000;  //The number of 10k substrings
+  int nbSubStrings = photoBase64.length() / 14000;  //The number of 10k substrings
   while(!Firebase.RTDB.setInt(&firebaseData, "/nbSubStrings", nbSubStrings));
  
   Firebase.RTDB.setBool(&firebaseData, "/uploading", true);
@@ -239,30 +239,30 @@ void capturePhotoUploadToFirebase() {
 
   for (int i = 0; i < nbSubStrings; i++) {
     FirebaseJson json;
-    json.set("p"+String(i), photoBase64.substring(0, 10000));
+    json.set("p"+String(i), photoBase64.substring(0, 14000));
     Firebase.updateNode(firebaseData, photoPath, json);
     // if (Firebase.updateNode(firebaseData, photoPath, json)) {
     //   // Serial.println(firebaseData.dataPath());
     //   // Serial.println(firebaseData.pushName());
     //   // Serial.println(firebaseData.dataPath() + "/" + firebaseData.pushName());
-    //   // Serial.println("Uploaded");
+    //   Serial.println("Uploaded");
     // } else {
-    //   // Serial.println(firebaseData.errorReason());
+    //   Serial.println(firebaseData.errorReason());
     // }
     // free();
-    photoBase64 = photoBase64.substring(10000, photoBase64.length());
+    photoBase64 = photoBase64.substring(14000, photoBase64.length());
   }
 
   FirebaseJson json2;
   json2.set("pL", photoBase64);
   Firebase.updateNode(firebaseData, photoPath, json2);
   // if (Firebase.updateNode(firebaseData, photoPath, json2)) {
-  //   // Serial.println(firebaseData.dataPath());
-  //   // Serial.println(firebaseData.pushName());
-  //   // Serial.println(firebaseData.dataPath() + "/" + firebaseData.pushName());
-  //   // Serial.println("Uploaded L");
+  // //   // Serial.println(firebaseData.dataPath());
+  // //   // Serial.println(firebaseData.pushName());
+  // //   // Serial.println(firebaseData.dataPath() + "/" + firebaseData.pushName());
+  //   Serial.println("Uploaded L");
   // } else {
-  //   // Serial.println(firebaseData.errorReason());
+  //   Serial.println(firebaseData.errorReason());
   // }
 
   Firebase.RTDB.setBool(&firebaseData, "/uploading", false);
