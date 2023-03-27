@@ -12,7 +12,7 @@
 #define EEPROM_SIZE 512          //Size used from the EEPROM to store ssid and password (max = 512bytes)
 BluetoothSerial SerialBT;        //Object for Bluetooth
 unsigned long previousTime = 0;  //Used to track elapsed time
-unsigned int interval = 1000;    //Time to wait for a bluetooth connection ms (30s)
+unsigned int interval = 30000;    //Time to wait for a bluetooth connection ms (30s)
 
 
 // CAMERA_MODEL_AI_THINKER
@@ -66,7 +66,7 @@ void setupCamera() {
   // init with high specs to pre-allocate larger buffers
   if (psramFound()) {
 
-    config.frame_size = FRAMESIZE_VGA;
+    config.frame_size = FRAMESIZE_HD;
 
     config.jpeg_quality = 12;  // 0-63 lower number means higher quality
 
@@ -74,7 +74,7 @@ void setupCamera() {
   } else {
 
     // Serial.println("NO PSRAM ----");    
-    config.frame_size = FRAMESIZE_VGA;
+    config.frame_size = FRAMESIZE_HD;
 
     config.jpeg_quality = 12;  // 0-63 lower number means higher quality
 
@@ -88,7 +88,7 @@ void setupCamera() {
     ESP.restart();
   }
   sensor_t *s = esp_camera_sensor_get();
-  s->set_framesize(s, FRAMESIZE_VGA);     // VGA|CIF|QVGA|HQVGA|QQVGA   ( UXGA? SXGA? XGA? SVGA? )
+  s->set_framesize(s, FRAMESIZE_HD);     // VGA|CIF|QVGA|HQVGA|QQVGA   ( UXGA? SXGA? XGA? SVGA? )
   s->set_brightness(s, 0);                  // -2 to 2
   s->set_contrast(s, 0);                    // -2 to 2
   s->set_saturation(s, 0);                  // -2 to 2
@@ -112,6 +112,8 @@ void setupCamera() {
   s->set_dcw(s, 1);                         // 0 = disable , 1 = enable
   s->set_colorbar(s, 0);                    // 0 = disable , 1 = enable
   s->set_xclk(s, 0, 2);
+
+  Serial.println("Camera Setup DONE");
 }
 
 boolean blueToothTimedOut() {
@@ -120,6 +122,7 @@ boolean blueToothTimedOut() {
   digitalWrite(RED_LED_GPIO_NUM, LOW);
   delay(1000);
   unsigned long currentTime = millis();
+  Serial.println((currentTime - previousTime)/1000);
   if (currentTime - previousTime >= interval) {
     previousTime = currentTime;
     return true;
@@ -130,7 +133,7 @@ boolean blueToothTimedOut() {
 void setup() {
   // put your setup code here, to run once:
   EEPROM.begin(EEPROM_SIZE);
-  // Serial.begin(115200);
+  Serial.begin(115200);
   SerialBT.begin("Bambino");
   setupLEDs();
 
@@ -182,18 +185,18 @@ void setup() {
   //Read WiFi Credentials from EEPROM
   String ssid = EEPROM.readString(0);
   String password = EEPROM.readString(256);
-  // Serial.println(ssid + " " + password);
+  Serial.println(ssid + " " + password);
 
   //Try to connect to Wifi using ssid and password
   WiFi.mode(WIFI_STA);
   WiFi.begin((const char *)ssid.c_str(), (const char *)password.c_str());
 
   if (WiFi.waitForConnectResult() != WL_CONNECTED) {
-    // Serial.println("WiFi Failed, Restarting...");
+    Serial.println("WiFi Failed, Restarting...");
     ESP.restart();  // to restart ESP32
   } else {
-    // Serial.print("Wifi Connected to ");
-    // Serial.println(ssid);
+    Serial.print("Wifi Connected to ");
+    Serial.println(ssid);
   }
 
   setupCamera();
