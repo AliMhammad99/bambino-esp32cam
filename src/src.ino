@@ -14,7 +14,11 @@
 
 #define PART_BOUNDARY "123456789000000000000987654321"
 
-#define EEPROM_SIZE 129          //Size used from the EEPROM to store ssid and password (max = 512bytes)
+#define EEPROM_SIZE 512          //Size used from the EEPROM to store ssid and password (max = 512bytes)
+#define SSID_INDEX 0
+#define PASS_INDEX 128
+#define MODE_INDEX 510
+
 BluetoothSerial SerialBT;        //Object for Bluetooth
 unsigned long previousTime = 0;  //Used to track elapsed time
 unsigned int interval = 30000;   //Time to wait for a bluetooth connection ms (30s)
@@ -276,7 +280,7 @@ void setup() {
       continue;
     }
     //Data recieved on Bluetooth (send any data to signify connection)
-    // Serial.println(SerialBT.readStringUntil('\n'));
+    Serial.println(SerialBT.readStringUntil('\n'));
 
     //Wait until recieving ssid
     while (!SerialBT.available())
@@ -285,7 +289,7 @@ void setup() {
     //Save ssid to EEPROM
     String enteredSSID = SerialBT.readStringUntil('\n');
     enteredSSID.remove(enteredSSID.length() - 1, 1);
-    EEPROM.writeString(0, enteredSSID);
+    EEPROM.writeString(SSID_INDEX, enteredSSID);
     EEPROM.commit();
     //Serial.println("SSID: "+SerialBT.readStringUntil('\n'));
 
@@ -296,7 +300,7 @@ void setup() {
     //Save password to EEPROM
     String enteredPassword = SerialBT.readStringUntil('\n');
     enteredPassword.remove(enteredPassword.length() - 1, 1);
-    EEPROM.writeString(64, enteredPassword);
+    EEPROM.writeString(PASS_INDEX, enteredPassword);
     EEPROM.commit();
 
     //Wait until recieving mode
@@ -306,8 +310,10 @@ void setup() {
     //Save mode to EEPROM
     String enteredMode = SerialBT.readStringUntil('\n');
     enteredMode.remove(enteredMode.length() - 1, 1);
-    EEPROM.writeString(128, enteredMode);
+    EEPROM.writeString(MODE_INDEX, enteredMode);
     EEPROM.commit();
+
+    Serial.println(enteredSSID+" "+enteredPassword+" "+enteredMode);
 
     //Break the bluetooth loop
     break;
@@ -326,13 +332,12 @@ void setup() {
 
 
   //Read WiFi Credentials from EEPROM
-  String ssid = EEPROM.readString(0);
-  String password = EEPROM.readString(64);
-  Serial.println(ssid + " " + password);
+  String ssid = EEPROM.readString(SSID_INDEX);
+  String password = EEPROM.readString(PASS_INDEX);
+  mode = EEPROM.readString(MODE_INDEX);
+  Serial.println(ssid + " " + password+" "+mode);
 
-  mode = EEPROM.readString(128);
-  Serial.println("MODE: " + mode);
-
+ 
   //Try to connect to Wifi using ssid and password
   // WiFi.mode(WIFI_STA);
   WiFi.begin((const char*)ssid.c_str(), (const char*)password.c_str());
@@ -348,7 +353,7 @@ void setup() {
 
 
   Serial.print("Camera Stream Ready! Go to: http://");
-  Serial.print(WiFi.localIP());
+  Serial.println(WiFi.localIP());
   setupCamera();
   if(mode=="0"){
     startCameraServer();
@@ -360,7 +365,7 @@ void setup() {
 
 void loop() {
   // put your main code here, to run repeatedly:
-  if(mode=="1"){
-    Serial.println("REMOTE MODE");
-  }
+  // if(mode=="1"){
+  //   Serial.println("REMOTE MODE");
+  // }
 }
