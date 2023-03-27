@@ -1,11 +1,11 @@
 #include <EEPROM.h>
 #include "BluetoothSerial.h"
 #include "WiFi.h"
-#include <Arduino.h>
-#include <base64.h>
-#include "FirebaseESP32.h"
-#include "soc/soc.h"
-#include "soc/rtc_cntl_reg.h"
+// #include <Arduino.h>
+
+
+// #include "soc/soc.h"
+// #include "soc/rtc_cntl_reg.h"
 #include "esp_camera.h"
 #include "esp_bt.h"
 
@@ -14,9 +14,6 @@ BluetoothSerial SerialBT;        //Object for Bluetooth
 unsigned long previousTime = 0;  //Used to track elapsed time
 unsigned int interval = 1000;    //Time to wait for a bluetooth connection ms (30s)
 
-String FIREBASE_HOST = "https://bambino-4aba4-default-rtdb.firebaseio.com/";
-String FIREBASE_AUTH = "AIzaSyDbKf1iJz7E5Yibr_W0UYcg_73NmbxWu-g";
-FirebaseData firebaseData;
 
 // CAMERA_MODEL_AI_THINKER
 #define PWDN_GPIO_NUM 32
@@ -69,7 +66,7 @@ void setupCamera() {
   // init with high specs to pre-allocate larger buffers
   if (psramFound()) {
 
-    config.frame_size = FRAMESIZE_SVGA;
+    config.frame_size = FRAMESIZE_VGA;
 
     config.jpeg_quality = 12;  // 0-63 lower number means higher quality
 
@@ -77,7 +74,7 @@ void setupCamera() {
   } else {
 
     // Serial.println("NO PSRAM ----");    
-    config.frame_size = FRAMESIZE_SVGA;
+    config.frame_size = FRAMESIZE_VGA;
 
     config.jpeg_quality = 12;  // 0-63 lower number means higher quality
 
@@ -91,7 +88,7 @@ void setupCamera() {
     ESP.restart();
   }
   sensor_t *s = esp_camera_sensor_get();
-  s->set_framesize(s, FRAMESIZE_SVGA);     // VGA|CIF|QVGA|HQVGA|QQVGA   ( UXGA? SXGA? XGA? SVGA? )
+  s->set_framesize(s, FRAMESIZE_VGA);     // VGA|CIF|QVGA|HQVGA|QQVGA   ( UXGA? SXGA? XGA? SVGA? )
   s->set_brightness(s, 0);                  // -2 to 2
   s->set_contrast(s, 0);                    // -2 to 2
   s->set_saturation(s, 0);                  // -2 to 2
@@ -117,22 +114,6 @@ void setupCamera() {
   s->set_xclk(s, 0, 2);
 }
 
-String getPhotoBase64() {
-  camera_fb_t *fb = NULL;
-  fb = esp_camera_fb_get();
-
-  if (!fb) {
-    // Serial.println("Camera capture failed");
-    return "";
-  }
-
-  String imageFile = "data:image/jpeg;base64,";
-  String encrypt = base64::encode(fb->buf, fb->len);
-
-  esp_camera_fb_return(fb);
-  return encrypt;
-}
-
 boolean blueToothTimedOut() {
   digitalWrite(RED_LED_GPIO_NUM, HIGH);
   delay(1000);
@@ -144,14 +125,6 @@ boolean blueToothTimedOut() {
     return true;
   }
   return false;
-}
-
-void setupFirebase(){
-  Firebase.begin(FIREBASE_HOST, FIREBASE_AUTH);
-  Firebase.reconnectWiFi(true);
-  Firebase.setMaxRetry(firebaseData, 3);
-  Firebase.setMaxErrorQueue(firebaseData, 30);
-  Firebase.enableClassicRequest(firebaseData, true);
 }
 
 void setup() {
@@ -224,76 +197,12 @@ void setup() {
   }
 
   setupCamera();
-  setupFirebase();
 }
 
-void capturePhotoUploadToFirebase() {
-  String photoBase64 = getPhotoBase64();
-  // Serial.println(photoBase64);
-  int nbSubStrings = photoBase64.length() / 14000;  //The number of 10k substrings
-  while(!Firebase.RTDB.setInt(&firebaseData, "/nbSubStrings", nbSubStrings));
- 
-  Firebase.RTDB.setBool(&firebaseData, "/uploading", true);
-  
-  String photoPath = "/c";
 
-  for (int i = 0; i < nbSubStrings; i++) {
-    FirebaseJson json;
-    json.set("p"+String(i), photoBase64.substring(0, 14000));
-    Firebase.updateNode(firebaseData, photoPath, json);
-    // if (Firebase.updateNode(firebaseData, photoPath, json)) {
-    //   // Serial.println(firebaseData.dataPath());
-    //   // Serial.println(firebaseData.pushName());
-    //   // Serial.println(firebaseData.dataPath() + "/" + firebaseData.pushName());
-    //   Serial.println("Uploaded");
-    // } else {
-    //   Serial.println(firebaseData.errorReason());
-    // }
-    // free();
-    photoBase64 = photoBase64.substring(14000, photoBase64.length());
-  }
 
-  FirebaseJson json2;
-  json2.set("pL", photoBase64);
-  Firebase.updateNode(firebaseData, photoPath, json2);
-  // if (Firebase.updateNode(firebaseData, photoPath, json2)) {
-  // //   // Serial.println(firebaseData.dataPath());
-  // //   // Serial.println(firebaseData.pushName());
-  // //   // Serial.println(firebaseData.dataPath() + "/" + firebaseData.pushName());
-  //   Serial.println("Uploaded L");
-  // } else {
-  //   Serial.println(firebaseData.errorReason());
-  // }
-
-  Firebase.RTDB.setBool(&firebaseData, "/uploading", false);
-}
-
-void updateStateFromFirebase() {
-  if (Firebase.RTDB.getBool(&firebaseData, "/FlashLED")) {
-    if (firebaseData.dataType() == "boolean") {
-      bool boolValue = firebaseData.boolData();
-      digitalWrite(FLASH_LED_GPIO_NUM, boolValue);
-      // Serial.println(boolValue);
-    }
-  } else {
-    // Serial.println(firebaseData.errorReason());
-  }
-}
-
-void deletePreviousFrameFromFirebase(){
-  Firebase.deleteNode(firebaseData, "/c");
-
-  // if (firebaseData.success()) {
-  //   Serial.println("Data deleted successfully!");
-  // } else {
-  //   Serial.println("Data deletion failed!");
-  //   Serial.println(firebaseData.errorReason());
-  // }
-}
 
 void loop() {
   // put your main code here, to run repeatedly:
-  capturePhotoUploadToFirebase();
-  updateStateFromFirebase();
-  // deletePreviousFrameFromFirebase();
+
 }
