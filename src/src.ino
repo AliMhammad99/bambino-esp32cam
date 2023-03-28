@@ -10,11 +10,11 @@
 #include "soc/soc.h"           //disable brownout problems
 #include "soc/rtc_cntl_reg.h"  //disable brownout problems
 #include "esp_http_server.h"
-
+#include <HTTPClient.h>
 
 #define PART_BOUNDARY "123456789000000000000987654321"
 
-#define EEPROM_SIZE 512          //Size used from the EEPROM to store ssid and password (max = 512bytes)
+#define EEPROM_SIZE 512  //Size used from the EEPROM to store ssid and password (max = 512bytes)
 #define SSID_INDEX 0
 #define PASS_INDEX 128
 #define MODE_INDEX 510
@@ -31,16 +31,11 @@ static const char* _STREAM_PART = "Content-Type: image/jpeg\r\nContent-Length: %
 
 httpd_handle_t stream_httpd = NULL;
 
-String mode;
+const char* server_url = "https://bambinoserver0.000webhostapp.com/upload.php";
+HTTPClient http;
+const int chunckSize = 16000;
 
-/*
-esp32cam: 2 modes: local and remote
-set mode using bluetooth (add drop down to mobile app with 2 options)
-save mode to EEPROM (1byte)
-max standard ssid and password?
-retrieve from EEPROM and save in global var 
-decide which function to run (startCameraServer() or webhost)
-*/
+String mode;  //mode 0 -> local, mode 1 -> remote
 
 // CAMERA_MODEL_AI_THINKER
 #define PWDN_GPIO_NUM 32
@@ -95,15 +90,22 @@ void setupCamera() {
 
     config.frame_size = FRAMESIZE_HD;
 
-    config.jpeg_quality = 12;  // 0-63 lower number means higher quality
-
+    if (mode == "0") {
+      config.jpeg_quality = 12;  // 0-63 lower number means higher quality
+    } else {
+      config.jpeg_quality = 35;
+    }
     config.fb_count = 1;
   } else {
 
     // Serial.println("NO PSRAM ----");
     config.frame_size = FRAMESIZE_HD;
 
-    config.jpeg_quality = 12;  // 0-63 lower number means higher quality
+    if (mode == "0") {
+      config.jpeg_quality = 12;  // 0-63 lower number means higher quality
+    } else {
+      config.jpeg_quality = 35;
+    }
 
     config.fb_count = 1;
   }
@@ -155,6 +157,82 @@ boolean blueToothTimedOut() {
     return true;
   }
   return false;
+}
+
+void listenToBlueTooth() {
+  //Data recieved on Bluetooth (send any data to signify connection)
+  Serial.println(SerialBT.readStringUntil('\n'));
+  SerialBT.flush();
+
+  //Wait until recieving ssid
+  while (!SerialBT.available())
+    ;
+
+  //Save ssid to EEPROM
+  String enteredSSID = SerialBT.readStringUntil('\n');
+  enteredSSID.remove(enteredSSID.length() - 1, 1);
+  EEPROM.writeString(SSID_INDEX, enteredSSID);
+  EEPROM.commit();
+  //Serial.println("SSID: "+SerialBT.readStringUntil('\n'));
+
+  //Wait until recieving password
+  while (!SerialBT.available())
+    ;
+
+  //Save password to EEPROM
+  String enteredPassword = SerialBT.readStringUntil('\n');
+  enteredPassword.remove(enteredPassword.length() - 1, 1);
+  EEPROM.writeString(PASS_INDEX, enteredPassword);
+  EEPROM.commit();
+
+  //Wait until recieving mode
+  while (!SerialBT.available())
+    ;
+
+  //Save mode to EEPROM
+  String enteredMode = SerialBT.readStringUntil('\n');
+  enteredMode.remove(enteredMode.length() - 1, 1);
+  EEPROM.writeString(MODE_INDEX, enteredMode);
+  EEPROM.commit();
+
+  Serial.println(enteredSSID + " " + enteredPassword + " " + enteredMode);
+  SerialBT.println("Received");
+}
+
+void turnOffBlueTooth() {
+  //Turn off bluetooth
+  btStop();
+  SerialBT.end();
+
+  //Free up memory
+  esp_bt_controller_mem_release(ESP_BT_MODE_BTDM);
+  esp_bt_controller_mem_release(ESP_BT_MODE_IDLE);
+  esp_bt_controller_mem_release(ESP_BT_MODE_BLE);
+  esp_bt_controller_mem_release(ESP_BT_MODE_CLASSIC_BT);
+}
+
+void connectWiFiUsingEEPROM() {
+  //Read WiFi Credentials from EEPROM
+  String ssid = EEPROM.readString(SSID_INDEX);
+  String password = EEPROM.readString(PASS_INDEX);
+  mode = EEPROM.readString(MODE_INDEX);
+  Serial.println(ssid + " " + password + " " + mode);
+
+
+  //Try to connect to Wifi using ssid and password
+  // WiFi.mode(WIFI_STA);
+  WiFi.begin((const char*)ssid.c_str(), (const char*)password.c_str());
+
+  if (WiFi.waitForConnectResult() != WL_CONNECTED) {
+    Serial.println("WiFi Failed, Restarting...");
+    ESP.restart();  // to restart ESP32
+  } else {
+    Serial.print("Wifi Connected to ");
+    Serial.println(ssid);
+  }
+
+  Serial.print("Camera Stream Ready! Go to: http://");
+  Serial.println(WiFi.localIP());
 }
 
 static esp_err_t stream_handler(httpd_req_t* req) {
@@ -229,7 +307,7 @@ static esp_err_t turn_flash_off(httpd_req_t* req) {
   return 200;
 }
 
-void startCameraServer() {
+void startLocalCameraServer() {
   httpd_config_t config = HTTPD_DEFAULT_CONFIG();
   config.server_port = 80;
   config.max_open_sockets = 2;
@@ -265,6 +343,58 @@ void startCameraServer() {
   }
 }
 
+void streamToRemoteServer() {
+  camera_fb_t* fb = esp_camera_fb_get();
+  if (!fb) {
+    Serial.println("Camera capture failed");
+    return;
+  }
+  Serial.println("IMAGE LENGTH: " + String(fb->len));
+  Serial.println("IMAGE FORMAT: " + String(fb->format));
+
+  if (http.begin(server_url)) {
+    http.addHeader("Content-Type", "image/jpeg");
+    http.setTimeout(30000);
+
+
+    int remaining = fb->len;
+    int offset = 0;
+
+    while (remaining > 0) {
+      Serial.println("Remaining: " + String(remaining));
+      Serial.println("Offset: " + String(offset));
+      int chunk_size = min(chunckSize, remaining);
+      Serial.println("Chunck Size: " + String(chunk_size));
+      int httpResponseCode = http.sendRequest("POST", fb->buf + offset, chunk_size);
+      if (httpResponseCode > 0) {
+        Serial.printf("HTTP response code: %d\n", httpResponseCode);
+
+      } else {
+        Serial.printf("HTTP request failed with error %s\n", http.errorToString(httpResponseCode).c_str());
+      }
+      offset += chunk_size;
+      remaining -= chunk_size;
+    }
+    http.end();
+  }
+
+  //Get flash led state
+  http.begin("https://bambinoserver0.000webhostapp.com/get_flash_led.php");
+  int httpCode = http.GET();
+  if (httpCode == HTTP_CODE_OK) {
+    String response = http.getString();
+    bool flashLED = response.toInt();
+    digitalWrite(FLASH_LED_GPIO_NUM, flashLED);
+  } else {
+    Serial.println("Error calling PHP script");
+  }
+
+  http.end();
+
+  // Free the photo buffer
+  esp_camera_fb_return(fb);
+}
+
 void setup() {
   // put your setup code here, to run once:
   EEPROM.begin(EEPROM_SIZE);
@@ -279,84 +409,17 @@ void setup() {
       //Nothing is recieved yet
       continue;
     }
-    //Data recieved on Bluetooth (send any data to signify connection)
-    Serial.println(SerialBT.readStringUntil('\n'));
-
-    //Wait until recieving ssid
-    while (!SerialBT.available())
-      ;
-
-    //Save ssid to EEPROM
-    String enteredSSID = SerialBT.readStringUntil('\n');
-    enteredSSID.remove(enteredSSID.length() - 1, 1);
-    EEPROM.writeString(SSID_INDEX, enteredSSID);
-    EEPROM.commit();
-    //Serial.println("SSID: "+SerialBT.readStringUntil('\n'));
-
-    //Wait until recieving password
-    while (!SerialBT.available())
-      ;
-
-    //Save password to EEPROM
-    String enteredPassword = SerialBT.readStringUntil('\n');
-    enteredPassword.remove(enteredPassword.length() - 1, 1);
-    EEPROM.writeString(PASS_INDEX, enteredPassword);
-    EEPROM.commit();
-
-    //Wait until recieving mode
-    while (!SerialBT.available())
-      ;
-
-    //Save mode to EEPROM
-    String enteredMode = SerialBT.readStringUntil('\n');
-    enteredMode.remove(enteredMode.length() - 1, 1);
-    EEPROM.writeString(MODE_INDEX, enteredMode);
-    EEPROM.commit();
-
-    Serial.println(enteredSSID+" "+enteredPassword+" "+enteredMode);
-
+    listenToBlueTooth();
     //Break the bluetooth loop
     break;
   }
-
-  //Turn off bluetooth
-  btStop();
-  SerialBT.end();
-  esp_bt_controller_mem_release(ESP_BT_MODE_BTDM);
-  esp_bt_controller_mem_release(ESP_BT_MODE_IDLE);
-  esp_bt_controller_mem_release(ESP_BT_MODE_BLE);
-  esp_bt_controller_mem_release(ESP_BT_MODE_CLASSIC_BT);
-  // free();
+  turnOffBlueTooth();
   delay(2000);
-
-
-
-  //Read WiFi Credentials from EEPROM
-  String ssid = EEPROM.readString(SSID_INDEX);
-  String password = EEPROM.readString(PASS_INDEX);
-  mode = EEPROM.readString(MODE_INDEX);
-  Serial.println(ssid + " " + password+" "+mode);
-
- 
-  //Try to connect to Wifi using ssid and password
-  // WiFi.mode(WIFI_STA);
-  WiFi.begin((const char*)ssid.c_str(), (const char*)password.c_str());
-
-  if (WiFi.waitForConnectResult() != WL_CONNECTED) {
-    Serial.println("WiFi Failed, Restarting...");
-    ESP.restart();  // to restart ESP32
-  } else {
-    Serial.print("Wifi Connected to ");
-    Serial.println(ssid);
-  }
-
-
-
-  Serial.print("Camera Stream Ready! Go to: http://");
-  Serial.println(WiFi.localIP());
+  connectWiFiUsingEEPROM();
   setupCamera();
-  if(mode=="0"){
-    startCameraServer();
+  if (mode == "0") {
+    //Local Mode
+    startLocalCameraServer();
   }
 }
 
@@ -365,7 +428,8 @@ void setup() {
 
 void loop() {
   // put your main code here, to run repeatedly:
-  // if(mode=="1"){
-  //   Serial.println("REMOTE MODE");
-  // }
+  if (mode == "1") {
+    //Remote Mode
+    streamToRemoteServer();
+  }
 }
