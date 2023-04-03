@@ -21,7 +21,7 @@
 
 BluetoothSerial SerialBT;        //Object for Bluetooth
 unsigned long previousTime = 0;  //Used to track elapsed time
-unsigned int interval = 1000;   //Time to wait for a bluetooth connection ms (30s)
+unsigned int interval = 30000;   //Time to wait for a bluetooth connection ms (30s)
 
 
 
@@ -88,23 +88,23 @@ void setupCamera() {
   // init with high specs to pre-allocate larger buffers
   if (psramFound()) {
 
-    config.frame_size = FRAMESIZE_SVGA;
+    config.frame_size = FRAMESIZE_HD;
 
     if (mode == "0") {
       config.jpeg_quality = 12;  // 0-63 lower number means higher quality
     } else {
-      config.jpeg_quality = 35;
+      config.jpeg_quality = 20;
     }
     config.fb_count = 1;
   } else {
 
     // Serial.println("NO PSRAM ----");
-    config.frame_size = FRAMESIZE_SVGA;
+    config.frame_size = FRAMESIZE_HD;
 
     if (mode == "0") {
       config.jpeg_quality = 12;  // 0-63 lower number means higher quality
     } else {
-      config.jpeg_quality = 35;
+      config.jpeg_quality = 20;
     }
 
     config.fb_count = 1;
@@ -117,7 +117,7 @@ void setupCamera() {
     ESP.restart();
   }
   sensor_t* s = esp_camera_sensor_get();
-  s->set_framesize(s, FRAMESIZE_SVGA);        // VGA|CIF|QVGA|HQVGA|QQVGA   ( UXGA? SXGA? XGA? SVGA? )
+  s->set_framesize(s, FRAMESIZE_HD);        // VGA|CIF|QVGA|HQVGA|QQVGA   ( UXGA? SXGA? XGA? SVGA? )
   s->set_brightness(s, 0);                  // -2 to 2
   s->set_contrast(s, 0);                    // -2 to 2
   s->set_saturation(s, 0);                  // -2 to 2
@@ -196,7 +196,7 @@ void listenToBlueTooth() {
   EEPROM.commit();
 
   Serial.println(enteredSSID + " " + enteredPassword + " " + enteredMode);
-  SerialBT.println("Received");
+  // SerialBT.println("Received");
 }
 
 void turnOffBlueTooth() {
@@ -422,9 +422,6 @@ void setup() {
     startLocalCameraServer();
   }
 }
-
-
-
 
 void loop() {
   // put your main code here, to run repeatedly:
