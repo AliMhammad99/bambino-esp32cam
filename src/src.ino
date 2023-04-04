@@ -21,7 +21,7 @@
 
 BluetoothSerial SerialBT;        //Object for Bluetooth
 unsigned long previousTime = 0;  //Used to track elapsed time
-unsigned int interval = 1000;    //Time to wait for a bluetooth connection ms (30s)
+unsigned int interval = 30000;   //Time to wait for a bluetooth connection ms (30s)
 
 
 
@@ -36,7 +36,6 @@ HTTPClient http;
 const int chunckSize = 16000;
 
 String mode;  //mode 0 -> local, mode 1 -> remote
-boolean localServerRunning = false;
 
 // CAMERA_MODEL_AI_THINKER
 #define PWDN_GPIO_NUM 32
@@ -237,7 +236,6 @@ void connectWiFiUsingEEPROM() {
 }
 
 static esp_err_t stream_handler(httpd_req_t* req) {
-  localServerRunning = true;
   camera_fb_t* fb = NULL;
   esp_err_t res = ESP_OK;
   size_t _jpg_buf_len = 0;
@@ -293,7 +291,6 @@ static esp_err_t stream_handler(httpd_req_t* req) {
     }
     //Serial.printf("MJPG: %uB\n",(uint32_t)(_jpg_buf_len));
   }
-  localServerRunning = false;
   return res;
 }
 
@@ -420,20 +417,16 @@ void setup() {
   delay(2000);
   connectWiFiUsingEEPROM();
   setupCamera();
-  // if (mode == "0") {
-  //Local Mode
-  startLocalCameraServer();
-  // }
+  if (mode == "0") {
+    //Local Mode
+    startLocalCameraServer();
+  }
 }
 
 void loop() {
   // put your main code here, to run repeatedly:
-  // if (mode == "1") {
-  //Remote Mode
-  if (localServerRunning) {
-    delay(5000);
-    return;
+  if (mode == "1") {
+    //Remote Mode
+    streamToRemoteServer();
   }
-  streamToRemoteServer();
-  // }
 }
