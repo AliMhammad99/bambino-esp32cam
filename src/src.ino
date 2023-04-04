@@ -76,7 +76,7 @@ void setupCamera() {
     config.fb_count = 1;
   } else {
 
-    // Serial.println("NO PSRAM ----");    
+    Serial.println("NO PSRAM ----");    
     config.frame_size = FRAMESIZE_HD;
 
     config.jpeg_quality = 25;  // 0-63 lower number means higher quality
@@ -86,7 +86,7 @@ void setupCamera() {
   // camera init
   esp_err_t err = esp_camera_init(&config);
   if (err != ESP_OK) {
-    // Serial.printf("Camera init failed with error 0x%x", err);
+    Serial.printf("Camera init failed with error 0x%x", err);
     delay(1000);
     ESP.restart();
   }
@@ -122,7 +122,7 @@ String getPhotoBase64() {
   fb = esp_camera_fb_get();
 
   if (!fb) {
-    // Serial.println("Camera capture failed");
+    Serial.println("Camera capture failed");
     return "";
   }
 
@@ -157,7 +157,7 @@ void setupFirebase(){
 void setup() {
   // put your setup code here, to run once:
   EEPROM.begin(EEPROM_SIZE);
-  // Serial.begin(115200);
+  Serial.begin(115200);
   SerialBT.begin("Bambino");
   setupLEDs();
 
@@ -180,7 +180,7 @@ void setup() {
     enteredSSID.remove(enteredSSID.length() - 1, 1);
     EEPROM.writeString(0, enteredSSID);
     EEPROM.commit();
-    //Serial.println("SSID: "+SerialBT.readStringUntil('\n'));
+    Serial.println("SSID: "+SerialBT.readStringUntil('\n'));
 
     //Wait until recieving password
     while (!SerialBT.available())
@@ -208,19 +208,19 @@ void setup() {
 
   //Read WiFi Credentials from EEPROM
   String ssid = EEPROM.readString(0);
-  String password = EEPROM.readString(256);
-  // Serial.println(ssid + " " + password);
+  String password = EEPROM.readString(128);
+  Serial.println(ssid + " " + password);
 
   //Try to connect to Wifi using ssid and password
   WiFi.mode(WIFI_STA);
   WiFi.begin((const char *)ssid.c_str(), (const char *)password.c_str());
 
   if (WiFi.waitForConnectResult() != WL_CONNECTED) {
-    // Serial.println("WiFi Failed, Restarting...");
+    Serial.println("WiFi Failed, Restarting...");
     ESP.restart();  // to restart ESP32
   } else {
-    // Serial.print("Wifi Connected to ");
-    // Serial.println(ssid);
+    Serial.print("Wifi Connected to ");
+    Serial.println(ssid);
   }
 
   setupCamera();
@@ -229,7 +229,7 @@ void setup() {
 
 void capturePhotoUploadToFirebase() {
   String photoBase64 = getPhotoBase64();
-  // Serial.println(photoBase64);
+  Serial.println(photoBase64);
   int nbSubStrings = photoBase64.length() / 14000;  //The number of 10k substrings
   while(!Firebase.RTDB.setInt(&firebaseData, "/nbSubStrings", nbSubStrings));
  
