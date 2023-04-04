@@ -425,8 +425,10 @@ void setup() {
 
 void loop() {
   // put your main code here, to run repeatedly:
-  if (mode == "1") {
-    //Remote Mode
-    streamToRemoteServer();
+  if (mode == "0") {
+    delay(10000);
+    return;
   }
+  //Remote Mode
+  streamToRemoteServer();
 }
