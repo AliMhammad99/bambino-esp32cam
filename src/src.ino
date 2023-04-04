@@ -71,7 +71,7 @@ void setupCamera() {
 
     config.frame_size = FRAMESIZE_HD;
 
-    config.jpeg_quality = 25;  // 0-63 lower number means higher quality
+    config.jpeg_quality = 30;  // 0-63 lower number means higher quality
 
     config.fb_count = 1;
   } else {
@@ -79,7 +79,7 @@ void setupCamera() {
     Serial.println("NO PSRAM ----");    
     config.frame_size = FRAMESIZE_HD;
 
-    config.jpeg_quality = 25;  // 0-63 lower number means higher quality
+    config.jpeg_quality = 30;  // 0-63 lower number means higher quality
 
     config.fb_count = 1;
   }
