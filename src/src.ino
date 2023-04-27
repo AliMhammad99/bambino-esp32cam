@@ -21,7 +21,7 @@
 
 BluetoothSerial SerialBT;        //Object for Bluetooth
 unsigned long previousTime = 0;  //Used to track elapsed time
-unsigned int interval = 1000;   //Time to wait for a bluetooth connection ms (30s)
+unsigned int interval = 1000;    //Time to wait for a bluetooth connection ms (30s)
 
 
 
@@ -298,13 +298,15 @@ static esp_err_t turn_flash_on(httpd_req_t* req) {
 
   Serial.println("Turn On");
   digitalWrite(FLASH_LED_GPIO_NUM, 1);
-  return 200;
+  httpd_resp_send(req, NULL, 0);  // send an empty response body
+  return ESP_OK;                  // return ESP_OK to indicate success
 }
 
 static esp_err_t turn_flash_off(httpd_req_t* req) {
   Serial.println("Turn Off");
   digitalWrite(FLASH_LED_GPIO_NUM, 0);
-  return 200;
+  httpd_resp_send(req, NULL, 0);  // send an empty response body
+  return ESP_OK;                  // return ESP_OK to indicate success
 }
 
 void startLocalCameraServer() {
