@@ -116,10 +116,6 @@ void setupCamera() {
     delay(1000);
     ESP.restart();
   }
-  // sensor_t* s = esp_camera_sensor_get();
-  // s->set_framesize(s, FRAMESIZE_HD);        // VGA|CIF|QVGA|HQVGA|QQVGA   ( UXGA? SXGA? XGA? SVGA? )
-  // s->set_xclk(s, 0, 2);
-
   Serial.println("Camera Setup DONE");
 }
 
